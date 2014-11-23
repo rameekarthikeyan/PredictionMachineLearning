@@ -1,0 +1,74 @@
+---
+title: "Predicting the class of the Exercise"
+output: html_document
+---
+This report will provide the prediction model that was built for the $pml$ dataset, obtained from the source - "http://groupware.les.inf.puc-rio.br/har". The report also provides the out of sample error calculated by bagging. The report is divided into the following sections:
+
+* Data extraction
+* Data analysis
+* Prediction modeling
+* Out of the sample error
+* Response for the test data
+
+**Data extraction:**
+The $pml-training$ and $pml-testing$ datasets are loaded into R. The datasets are then subsetted into smaller dataset by extracting only the variables (columns) that had non-blank values. This is done by using $grep$ function. The columns containing "name" and "time" are not considered for the subset.
+ 
+```{r}
+library(data.table)
+library(randomForest)
+library(ggplot2)
+library(lattice)
+outofsample <-vector(length =10)
+ml <- vector("list", length = 10)
+trainDF <- read.csv("./pml-training.csv")
+testDF <- read.csv("./pml-testing.csv")
+trainDT1 <- data.table(trainDF)
+testDF <- data.table(testDF)
+nufn <- function(x) {
+  grep(x, colnames(trainDT1), value = TRUE)
+  
+}
+mufn <- function(x) {
+  grep(x, colnames(testDF), value = TRUE)
+  
+}
+lt <- c("^[g]yros_", "^[a]ccel_", "^[t]otal_","^[m]agnet_", "^[r]oll_", "^[p]itch_", "^[y]aw_","^[c]lasse")
+mt <- c("^[g]yros_", "^[a]ccel_", "^[t]otal_","^[m]agnet_", "^[r]oll_", "^[p]itch_", "^[y]aw_")
+valm <- unlist(lapply(lt, nufn))
+trainpreds <- trainDT1[,valm, with = FALSE]
+valn <- unlist(lapply(mt, mufn))
+testpreds <- testDF[,valn, with = FALSE]
+```
+**Data analysis:**
+On analyzing the dataset, it can be inferred that the response variable is $categorical$ and the prediction problem is of $classification$ type. The predicted response belongs to the set
+$$ G = \{ A,B,C,D,E \}$$
+
+**Prediction modeling:**
+The method that is used to predict the class of the exercise is $random forest$. Since $random forest$ is based on $trees$, this method is chosen. Cross validation is performed within $random forest$ method by $bagging$. 
+```{r}
+ml <- randomForest(x= trainpreds[,!"classe", with = FALSE], y = trainpreds$classe)
+ml
+outofsample <-(nrow(trainpreds) -sum(diag(ml$confusion)))/nrow(trainpreds)
+classehat <- predict(ml,newdata=testpreds)
+```
+**Out of the sample error:**
+The expected out of sample error is 20%. The Out Of Bag (OOB) error estimate is performed all along while predicting with random forest, in other words, the cross validation ($bagging$) is done as part of random forest method. The out of the sample error calculated by cross validation within the $random forest$ method is given by `r outofsample `.
+
+```{r}
+outofsample
+```
+
+**Response for the test data:**
+The response for the $pml-testing$ dataset predicted by the model is given below.
+
+```{r}
+classehat
+```
+
+
+```{r, echo=FALSE}
+plot(ml, main = "Error Versus Number of trees")
+varImpPlot(ml, main = "Variable Importance Plot")
+```
+
+
